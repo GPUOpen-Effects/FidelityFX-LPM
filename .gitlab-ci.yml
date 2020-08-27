@@ -20,6 +20,19 @@ build_dx12:
   - 'cmake -S . -B build/DX12 -DGFX_API=DX12 %CMakeConfig%'
   - 'cmake --build build/DX12 --config Release'
 
+build_vk:
+  tags:
+  - windows
+  - amd64
+  stage: build
+  artifacts:
+    paths:
+    - sample/bin/
+  script:
+  - 'cd sample'
+  - 'cmake -S . -B build/Vk -DGFX_API=VK %CMakeConfig%'
+  - 'cmake --build build/Vk --config Release'
+
 package_sample:
   tags:
   - windows
@@ -27,11 +40,15 @@ package_sample:
   stage: deploy
   dependencies:
     - build_dx12
+    - build_vk
   script:
   - mkdir "%SampleName%"
   - move sample/bin "%SampleName%"
+  - copy %VULKAN_SDK%\Bin\glslc.exe %SampleName%\bin
   - move NOTICES.txt %SampleName%
   - move sample/media %SampleName%
+  - echo cd .\%SampleName%\bin\ > %SampleName%_VK.bat
+  - echo start %SampleName%_VK.exe >> %SampleName%_VK.bat
   - echo cd .\%SampleName%\bin\ > %SampleName%_DX12.bat
   - echo start %SampleName%_DX12.exe >> %SampleName%_DX12.bat
   artifacts:
@@ -40,4 +57,5 @@ package_sample:
       - "%SampleName%/bin/"
       - "%SampleName%/NOTICES.txt"
       - "%SampleName%/media"
+      - "%SampleName%_VK.bat"
       - "%SampleName%_DX12.bat"

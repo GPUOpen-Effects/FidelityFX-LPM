@@ -262,10 +262,12 @@ int SampleRenderer::LoadScene(GLTFCommon *pGLTFCommon, int stage)
             &m_VidMemBufferPool,
             m_pGLTFTexturesAndBuffers,
             nullptr,
+            false,
             USE_SHADOWMASK,
             m_HDRMSAA.GetFormat(), // forward pass channel
             DXGI_FORMAT_UNKNOWN,   // specular-roughness channel
             DXGI_FORMAT_UNKNOWN,   // diffuse channel
+            DXGI_FORMAT_UNKNOWN,   // normal channel
             4
         );
 #if (USE_VID_MEM==true)

@@ -18,17 +18,21 @@
 // THE SOFTWARE.
 #pragma once
 
-#include "PostProc\PostProcPS.h"
+#include "PostProc/PostProcPS.h"
+#include "Base/ResourceViewHeaps.h"
+#include "Misc/ColorConversion.h"
 
-namespace CAULDRON_DX12
+namespace CAULDRON_VK
 {
     class LPMPS
     {
     public:
-        void OnCreate(Device* pDevice, ResourceViewHeaps *pResourceViewHeaps, DynamicBufferRing *pDynamicBufferRing, StaticBufferPool  *pStaticBufferPool, DXGI_FORMAT outFormat);
+        void OnCreate(Device* pDevice, VkRenderPass renderPass, ResourceViewHeaps *pResourceViewHeaps, StaticBufferPool  *pStaticBufferPool, DynamicBufferRing *pDynamicBufferRing);
         void OnDestroy();
-        void UpdatePipeline(DXGI_FORMAT outFormat, DisplayModes displayMode, ColorSpace colourSpace);
-        void Draw(ID3D12GraphicsCommandList* pCommandList, CBV_SRV_UAV *pSRV);
+
+        void UpdatePipelines(VkRenderPass renderPass, DisplayModes displayMode, ColorSpace colorSpace);
+
+        void Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV);
 
     private:
         // LPM Only
@@ -58,8 +62,19 @@ namespace CAULDRON_DX12
         float m_crosstalk[3]; // One channel must be 1.0, the rest can be <= 1.0 but not zero.
         // LPM Only
 
+        Device* m_pDevice;
+        ResourceViewHeaps *m_pResourceViewHeaps;
+
         PostProcPS m_lpm;
         DynamicBufferRing *m_pDynamicBufferRing = NULL;
+
+        VkSampler m_sampler;
+
+        uint32_t              m_descriptorIndex;
+        static const uint32_t s_descriptorBuffers = 10;
+
+        VkDescriptorSet       m_descriptorSet[s_descriptorBuffers];
+        VkDescriptorSetLayout m_descriptorSetLayout;
 
         DisplayModes m_displayMode;
         XMMATRIX m_inputToOutputMatrix;

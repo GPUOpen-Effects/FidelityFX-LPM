@@ -17,10 +17,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//--------------------------------------------------------------------------------------
-// Constant Buffer
-//--------------------------------------------------------------------------------------
-cbuffer cbPerFrame : register(b0)
+#version 460
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+#extension GL_ARB_gpu_shader_fp64 : enable
+
+layout (location = 0) in vec2 inTexCoord;
+
+layout (location = 0) out vec4 outColor;
+
+layout (std140, binding = 0) uniform perBatch 
 {
     bool u_shoulder;
     bool u_con;
@@ -30,43 +36,36 @@ cbuffer cbPerFrame : register(b0)
     bool u_scaleOnly;
     uint u_displayMode;
     uint pad;
-    matrix u_inputToOutputMatrix;
-    uint4 u_ctl[24];
-}
+    mat4 u_inputToOutputMatrix;
+    ivec4 u_ctl[24 * 4];
+} myPerScene;
+
+layout(set=0, binding=1) uniform sampler2D sSampler;
 
 //--------------------------------------------------------------------------------------
-// I/O Structures
+// Timothy Lottes LPM
 //--------------------------------------------------------------------------------------
-struct VERTEX
-{
-    float2 vTexcoord : TEXCOORD;
-};
-
-//--------------------------------------------------------------------------------------
-// Texture definitions
-//--------------------------------------------------------------------------------------
-Texture2D        sceneTexture     : register(t0);
-SamplerState     samLinearWrap    : register(s0);
 
 #define A_GPU 1
-#define A_HLSL 1
+#define A_GLSL 1
+
 #include "ffx_a.h"
 
-uint4 LpmFilterCtl(uint i) { return u_ctl[i]; }
+AU4 LpmFilterCtl(AU1 i)
+{
+    return myPerScene.u_ctl[i];
+}
 
 #define LPM_NO_SETUP 1
 #include "ffx_lpm.h"
 
-#include "transferFunction.h"
+#include "transferfunction.h"
 
-//--------------------------------------------------------------------------------------
-// Main function
-//--------------------------------------------------------------------------------------
-float4 mainPS(VERTEX Input) : SV_Target
+void main() 
 {
-    float4 color = sceneTexture.Sample(samLinearWrap, Input.vTexcoord);
+    vec4 color = texture(sSampler, inTexCoord.st);
 
-    color = mul(u_inputToOutputMatrix, color);
+    color = myPerScene.u_inputToOutputMatrix * color;
 
     // This code is there to make sure no negative values make it down to LPM. Make sure to never hit this case and convert content to correct colourspace
     color.r = max(0, color.r);
@@ -74,14 +73,14 @@ float4 mainPS(VERTEX Input) : SV_Target
     color.b = max(0, color.b);
     //
 
-    LpmFilter(color.r, color.g, color.b, u_shoulder, u_con, u_soft, u_con2, u_clip, u_scaleOnly);
+    LpmFilter(color.r, color.g, color.b, myPerScene.u_shoulder, myPerScene.u_con, myPerScene.u_soft, myPerScene.u_con2, myPerScene.u_clip, myPerScene.u_scaleOnly);
 
-    switch (u_displayMode)
+    switch (myPerScene.u_displayMode)
     {
-        case 1:
+        case 1: 
             // FS2_DisplayNative
             // Apply gamma
-            color.xyz = ApplyGamma(color.xyz);
+            color.xyz = ApplyGamma(color.rgb);
             break;
 
         case 3:
@@ -91,5 +90,5 @@ float4 mainPS(VERTEX Input) : SV_Target
             break;
     }
 
-    return color;
+    outColor = color;
 }

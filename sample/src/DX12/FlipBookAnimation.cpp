@@ -76,8 +76,8 @@ namespace CAULDRON_DX12
         D3D12_SHADER_BYTECODE shaderVert, shaderPixel;
         {
             DefineList defines;
-            CompileShaderFromFile("FlipBookAnimationVS.hlsl", &defines, "mainVS", "vs_5_0", 0, &shaderVert);
-            CompileShaderFromFile("FlipBookAnimationPS.hlsl", &defines, "mainPS", "ps_5_0", 0, &shaderPixel);
+            CompileShaderFromFile("FlipBookAnimationVS.hlsl", &defines, "mainVS", "-T vs_6_0", &shaderVert);
+            CompileShaderFromFile("FlipBookAnimationPS.hlsl", &defines, "mainPS", "-T ps_6_0", &shaderPixel);
         }
 
         // Create root signature

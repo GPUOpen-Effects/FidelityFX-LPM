@@ -20,9 +20,10 @@
 #include "stdafx.h"
 #include "Base/DynamicBufferRing.h"
 #include "Base/ShaderCompiler.h"
+#include "Base/ExtDebugMarkers.h"
 #include "Base/UploadHeap.h"
-#include "Base/FreesyncHDR.h"
-#include "Misc/ColorConversion.h"
+#include "Base/FreeSyncHDR.h"
+#include "Base/Helper.h"
 #include "LPMPS.h"
 
 // LPM
@@ -39,33 +40,62 @@ A_STATIC void LpmSetupOut(AU1 i, inAU4 v)
 }
 #include "../../../ffx-lpm/ffx_lpm.h"
 
-namespace CAULDRON_DX12
+namespace CAULDRON_VK
 {
-    void LPMPS::OnCreate(Device* pDevice, ResourceViewHeaps *pResourceViewHeaps, DynamicBufferRing *pDynamicBufferRing, StaticBufferPool  *pStaticBufferPool, DXGI_FORMAT outFormat)
+    void LPMPS::OnCreate(Device* pDevice, VkRenderPass renderPass, ResourceViewHeaps *pResourceViewHeaps, StaticBufferPool  *pStaticBufferPool, DynamicBufferRing *pDynamicBufferRing)
     {
+        m_pDevice = pDevice;
         m_pDynamicBufferRing = pDynamicBufferRing;
+        m_pResourceViewHeaps = pResourceViewHeaps;
 
-        D3D12_STATIC_SAMPLER_DESC SamplerDesc = {};
-        SamplerDesc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-        SamplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        SamplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        SamplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        SamplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-        SamplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        SamplerDesc.MinLOD = 0.0f;
-        SamplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
-        SamplerDesc.MipLODBias = 0;
-        SamplerDesc.MaxAnisotropy = 1;
-        SamplerDesc.ShaderRegister = 0;
-        SamplerDesc.RegisterSpace = 0;
-        SamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        {
+            VkSamplerCreateInfo info = {};
+            info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            info.magFilter = VK_FILTER_LINEAR;
+            info.minFilter = VK_FILTER_LINEAR;
+            info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            info.minLod = -1000;
+            info.maxLod = 1000;
+            info.maxAnisotropy = 1.0f;
+            VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
+            assert(res == VK_SUCCESS);
+        }
 
-        m_lpm.OnCreate(pDevice, "LPMPS.hlsl", pResourceViewHeaps, pStaticBufferPool, 1, 1, &SamplerDesc, outFormat, 1, NULL, NULL, 1);
+        std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+        layoutBindings[0].binding = 0;
+        layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        layoutBindings[0].descriptorCount = 1;
+        layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        layoutBindings[0].pImmutableSamplers = NULL;
+
+        layoutBindings[1].binding = 1;
+        layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        layoutBindings[1].descriptorCount = 1;
+        layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        layoutBindings[1].pImmutableSamplers = NULL;
+
+        m_pResourceViewHeaps->CreateDescriptorSetLayout(&layoutBindings, &m_descriptorSetLayout);
+
+        m_lpm.OnCreate(m_pDevice, renderPass, "LPMPS.glsl", "main", "", pStaticBufferPool, pDynamicBufferRing, m_descriptorSetLayout, NULL, VK_SAMPLE_COUNT_1_BIT);
+
+        m_descriptorIndex = 0;
+        for (int i = 0; i < s_descriptorBuffers; i++)
+            m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_descriptorSet[i]);
     }
 
     void LPMPS::OnDestroy()
     {
         m_lpm.OnDestroy();
+
+        for (int i = 0; i < s_descriptorBuffers; i++)
+            m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
+
+        vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+
+        vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
     }
 
     void LPMPS::SetLPMConfig(bool con, bool soft, bool con2, bool clip, bool scaleOnly)
@@ -101,10 +131,9 @@ namespace CAULDRON_DX12
 
         m_scaleC = scaleC;
     }
-
-    void LPMPS::UpdatePipeline(DXGI_FORMAT outFormat, DisplayModes displayMode, ColorSpace colorSpace)
+    void LPMPS::UpdatePipelines(VkRenderPass renderPass, DisplayModes displayMode, ColorSpace colorSpace)
     {
-        m_lpm.UpdatePipeline(outFormat);
+        m_lpm.UpdatePipeline(renderPass, NULL, VK_SAMPLE_COUNT_1_BIT);
 
         m_displayMode = displayMode;
 
@@ -114,28 +143,29 @@ namespace CAULDRON_DX12
             &m_inputToOutputMatrix
         );
 
+        // LPM Only setup
         varAF2(fs2R);
         varAF2(fs2G);
         varAF2(fs2B);
         varAF2(fs2W);
         varAF2(displayMinMaxLuminance);
-        if (displayMode != DISPLAYMODE_SDR)
+        if (m_displayMode != DISPLAYMODE_SDR)
         {
-            const AGSDisplayInfo *agsDisplayInfo = fsHdrGetDisplayInfo();
+            const VkHdrMetadataEXT *pHDRMetatData = fsHdrGetDisplayInfo();
 
             // Only used in fs2 modes
-            fs2R[0] = (float) agsDisplayInfo->chromaticityRedX;
-            fs2R[1] = (float) agsDisplayInfo->chromaticityRedY;
-            fs2G[0] = (float) agsDisplayInfo->chromaticityGreenX;
-            fs2G[1] = (float) agsDisplayInfo->chromaticityGreenY;
-            fs2B[0] = (float) agsDisplayInfo->chromaticityBlueX;
-            fs2B[1] = (float) agsDisplayInfo->chromaticityBlueY;
-            fs2W[0] = (float) agsDisplayInfo->chromaticityWhitePointX;
-            fs2W[1] = (float) agsDisplayInfo->chromaticityWhitePointY;
+            fs2R[0] = pHDRMetatData->displayPrimaryRed.x;
+            fs2R[1] = pHDRMetatData->displayPrimaryRed.y;
+            fs2G[0] = pHDRMetatData->displayPrimaryGreen.x;
+            fs2G[1] = pHDRMetatData->displayPrimaryGreen.y;
+            fs2B[0] = pHDRMetatData->displayPrimaryBlue.x;
+            fs2B[1] = pHDRMetatData->displayPrimaryBlue.y;
+            fs2W[0] = pHDRMetatData->whitePoint.x;
+            fs2W[1] = pHDRMetatData->whitePoint.y;
             // Only used in fs2 modes
 
-            displayMinMaxLuminance[0] = (float) agsDisplayInfo->minLuminance;
-            displayMinMaxLuminance[1] = (float) agsDisplayInfo->maxLuminance;
+            displayMinMaxLuminance[0] = pHDRMetatData->minLuminance;
+            displayMinMaxLuminance[1] = pHDRMetatData->maxLuminance;
         }
         m_shoulder = 0;
         m_softGap = 1.0f / 32.0f;
@@ -150,7 +180,7 @@ namespace CAULDRON_DX12
         {
         case ColorSpace_REC709:
         {
-            switch (displayMode)
+            switch (m_displayMode)
             {
             case DISPLAYMODE_SDR:
                 SetLPMConfig(LPM_CONFIG_709_709);
@@ -275,11 +305,11 @@ namespace CAULDRON_DX12
             m_saturation, m_crosstalk);
     }
 
-    void LPMPS::Draw(ID3D12GraphicsCommandList* pCommandList, CBV_SRV_UAV *pSRV)
+    void LPMPS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV)
     {
-        UserMarker marker(pCommandList, "LPM Tonemapper");
+        SetPerfMarkerBegin(cmd_buf, "LPM Tonemapper");
 
-        D3D12_GPU_VIRTUAL_ADDRESS cbLPMHandle;
+        VkDescriptorBufferInfo cbLPMHandle;
         LPMConsts *pLPM;
         m_pDynamicBufferRing->AllocConstantBuffer(sizeof(LPMConsts), (void **)&pLPM, &cbLPMHandle);
         pLPM->shoulder = m_shoulder;
@@ -296,6 +326,18 @@ namespace CAULDRON_DX12
             pLPM->ctl[i] = ctl[i];
         }
 
-        m_lpm.Draw(pCommandList, 1, pSRV, cbLPMHandle);
+        // We'll be modifying the descriptor set(DS), to prevent writing on a DS that is in use we 
+        // need to do some basic buffering. Just to keep it safe and simple we'll have 10 buffers.
+        VkDescriptorSet descriptorSet = m_descriptorSet[m_descriptorIndex];
+        m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
+
+        // modify Descriptor set
+        SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, &m_sampler, descriptorSet);
+        m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(LPMConsts), descriptorSet);
+
+        // Draw!
+        m_lpm.Draw(cmd_buf, cbLPMHandle, descriptorSet);
+
+        SetPerfMarkerEnd(cmd_buf);
     }
 }

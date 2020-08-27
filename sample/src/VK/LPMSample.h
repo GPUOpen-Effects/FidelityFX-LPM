@@ -18,6 +18,7 @@
 // THE SOFTWARE.
 #pragma once
 
+
 #include "SampleRenderer.h"
 
 
@@ -46,9 +47,10 @@ public:
     void OnRender();
     bool OnEvent(MSG msg);
     void OnResize(uint32_t Width, uint32_t Height);
+    void OnLocalDimmingChanged();
     void OnActivate(bool windowActive);
     void SetFullScreen(bool fullscreen);
-    
+
 private:
 
     Device m_device;
@@ -60,7 +62,7 @@ private:
     DisplayModes m_currentDisplayModeNamesIndex;
     std::vector<DisplayModes> m_displayModesAvailable;
     std::vector<const char *> m_displayModesNamesAvailable;
-    bool m_disableLocalDimming;
+    bool m_enableLocalDimming;
 
     GLTFCommon *m_pGltfLoader;
 
@@ -68,7 +70,7 @@ private:
     SampleRenderer::State m_state;
 
     float m_time;
-    double m_deltaTime;        // The elapsed time since the previous frame.
+    double m_deltaTime;        // The elapsed time in milliseconds since the previous frame.
     double m_lastFrameTime;
 
     bool m_isCpuValidationLayerEnabled = false;

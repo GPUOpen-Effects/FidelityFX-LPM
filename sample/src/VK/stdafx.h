@@ -28,14 +28,16 @@
 #include <windows.h>
 #include <windowsx.h>
 
-
 // C RunTime Header Files
 #include <malloc.h>
 #include <map>
 #include <mutex>
-#include <vector>
 #include <fstream>
-#include "..\..\libs\d3d12x\d3dx12.h"
+#include <vector>
+
+#define VK_USE_PLATFORM_WIN32_KHR 1
+#include "vulkan/vulkan.h"
+
 
 // we are using DirectXMath
 #include <DirectXMath.h>
@@ -44,45 +46,48 @@ using namespace DirectX;
 // TODO: reference additional headers your program requires here
 #include "base\Imgui.h"
 #include "Base\ImguiHelper.h"
-#include "base\Fence.h"
-#include "Base\Helper.h"
-#include "Base\Device.h"
-#include "base\FreesyncHDR.h"
 #include "base\Texture.h"
+#include "base\Device.h"
 #include "base\SwapChain.h"
+#include "base\ExtFreeSyncHDR.h"
+#include "Base\FreeSyncHDR.h"
+#include "Base\Helper.h"
 #include "base\UploadHeap.h"
-#include "Base\UserMarkers.h"
-#include "base\GPUTimestamps.h"
+#include "base\GPUTimeStamps.h"
+#include "Base\ExtDebugMarkers.h"
 #include "base\CommandListRing.h"
-#include "base\ShaderCompilerHelper.h"
 #include "base\StaticBufferPool.h"
 #include "base\DynamicBufferRing.h"
 #include "base\ResourceViewHeaps.h"
-#include "base\StaticConstantBufferPool.h"
+#include "Base\ShaderCompilerHelper.h"
 
-#include "Misc\Misc.h"
 #include "Misc\Error.h"
-#include "Misc\Camera.h"
-#include "Misc\FrameworkWindows.h"
-#include "Misc\ColorConversion.h"
+#include "misc\Misc.h"
+#include "misc\Camera.h"
 
 #include "GLTF\GltfPbrPass.h"
-#include "GLTF\GltfDepthPass.h"
 #include "GLTF\GltfBBoxPass.h"
+#include "GLTF\GltfDepthPass.h"
 
+#include "PostProc\Bloom.h"
+#include "PostProc\BlurPS.h"
+#include "PostProc\SkyDome.h"
+#include "PostProc\SkyDomeProc.h"
+#include "PostProc\DownSamplePS.h"
 #include "PostProc\ColorConversionPS.h"
 #include "PostProc\ToneMapping.h"
 #include "PostProc\ToneMappingCS.h"
-#include "PostProc\DownSamplePS.h"
-#include "PostProc\SkyDome.h"
-#include "PostProc\SkyDomeProc.h"
-#include "PostProc\BlurPS.h"
-#include "PostProc\Bloom.h"
 
 #include "TestImages.h"
 #include "FlipBookAnimation.h"
 #include "LPMPS.h"
 #include "ExposureMultiplierCS.h"
 
-#include "Widgets\wireframe.h"
-using namespace CAULDRON_DX12;
+#include "Widgets\Axis.h"
+#include "Widgets\CheckerBoardFloor.h"
+
+#include "..\common\Misc\Camera.h"
+#include "..\common\Misc\FrameworkWindows.h"
+#include "..\common\Misc\ColorConversion.h"
+
+using namespace CAULDRON_VK;

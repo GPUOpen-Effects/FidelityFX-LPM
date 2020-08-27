@@ -21,6 +21,7 @@
 
 #include "LPMSample.h"
 
+
 LPMSample::LPMSample(LPCSTR name) : FrameworkWindows(name)
 {
     m_lastFrameTime = MillisecondsNow();
@@ -29,7 +30,7 @@ LPMSample::LPMSample(LPCSTR name) : FrameworkWindows(name)
 
     m_pGltfLoader = NULL;
     m_previousDisplayMode = m_currentDisplayMode = m_previousDisplayModeNamesIndex = m_currentDisplayModeNamesIndex = DISPLAYMODE_SDR;
-    m_disableLocalDimming = false;
+    m_enableLocalDimming = true;
 }
 
 //--------------------------------------------------------------------------------------
@@ -58,7 +59,6 @@ void LPMSample::OnCreate(HWND hWnd)
     m_device.CreatePipelineCache();
 
     //init the shader compiler
-    InitDirectXCompiler();
     CreateShaderCache();
 
     // Create Swapchain
@@ -103,7 +103,7 @@ void LPMSample::OnDestroy()
     m_previousDisplayMode = m_currentDisplayMode = m_previousDisplayModeNamesIndex = m_currentDisplayModeNamesIndex = DISPLAYMODE_SDR;
 
     // Fullscreen state should always be false before exiting the app.
-    m_swapChain.SetFullScreen(false);
+    SetFullScreen(false);
 
     m_Node->UnloadScene();
     m_Node->OnDestroyWindowSizeDependentResources();
@@ -113,7 +113,7 @@ void LPMSample::OnDestroy()
 
     m_swapChain.OnDestroyWindowSizeDependentResources();
     m_swapChain.OnDestroy();
-
+    
     //shut down the shader compiler 
     DestroyShaderCache(&m_device);
 
@@ -178,16 +178,16 @@ void LPMSample::OnResize(uint32_t width, uint32_t height)
         m_swapChain.OnDestroyWindowSizeDependentResources();
     }
 
+    m_swapChain.EnumerateDisplayModes(&m_displayModesAvailable, &m_displayModesNamesAvailable);
+
     m_Width = width;
     m_Height = height;
-
-    m_swapChain.EnumerateDisplayModes(&m_displayModesAvailable, &m_displayModesNamesAvailable);
 
     // if resizing but not minimizing the recreate it with the new size
     //
     if (m_Width > 0 && m_Height > 0)
     {
-        m_swapChain.OnCreateWindowSizeDependentResources(m_Width, m_Height, false, m_currentDisplayMode, m_disableLocalDimming);
+        m_swapChain.OnCreateWindowSizeDependentResources(m_Width, m_Height, false, m_currentDisplayMode);
         if (m_Node != NULL)
         {
             m_Node->OnCreateWindowSizeDependentResources(&m_swapChain, m_Width, m_Height, &m_state);
@@ -195,6 +195,7 @@ void LPMSample::OnResize(uint32_t width, uint32_t height)
     }
 
     m_state.camera.SetFov(XM_PI / 4, m_Width, m_Height, 0.1f, 1000.0f);
+
 }
 
 //--------------------------------------------------------------------------------------
@@ -208,9 +209,24 @@ void LPMSample::OnActivate(bool windowActive)
         return;
 
     m_currentDisplayMode = windowActive && m_swapChain.IsFullScreen() ? m_previousDisplayMode : DisplayModes::DISPLAYMODE_SDR;
-    m_currentDisplayModeNamesIndex= windowActive && m_swapChain.IsFullScreen() ? m_previousDisplayModeNamesIndex : DisplayModes::DISPLAYMODE_SDR;
-
+    m_currentDisplayModeNamesIndex = windowActive && m_swapChain.IsFullScreen() ? m_previousDisplayModeNamesIndex : DisplayModes::DISPLAYMODE_SDR;
     OnResize(m_Width, m_Height);
+}
+
+//--------------------------------------------------------------------------------------
+//
+// OnLocalDimmingChanged
+//
+//--------------------------------------------------------------------------------------
+void LPMSample::OnLocalDimmingChanged()
+{
+    // Flush GPU
+    //
+    m_device.GPUFlush();
+
+    fsHdrSetLocalDimmingMode(m_swapChain.GetSwapChain(), m_enableLocalDimming);
+
+    m_Node->OnUpdateLocalDimmingChangedResources(&m_swapChain, &m_state);
 }
 
 //--------------------------------------------------------------------------------------
@@ -227,7 +243,7 @@ void LPMSample::OnRender()
     m_lastFrameTime = timeNow;
 
     // Build UI and set the scene state. Note that the rendering of the UI happens later.
-    //    
+    //
     ImGUI_UpdateIO();
     ImGui::NewFrame();
 
@@ -256,7 +272,7 @@ void LPMSample::OnRender()
         if (ImGui::CollapsingHeader("Info", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::Text("Resolution       : %ix%i", m_Width, m_Height);
-            std::vector<TimeStamp> timeStamps = m_Node->GetTimingValues();
+            const std::vector<TimeStamp> timeStamps = m_Node->GetTimingValues();
             if (timeStamps.size() > 0)
             {
                 static float values[128];
@@ -310,9 +326,9 @@ void LPMSample::OnRender()
 
             if (m_currentDisplayMode == DisplayModes::DISPLAYMODE_FSHDR_Gamma22 || m_currentDisplayMode == DisplayModes::DISPLAYMODE_FSHDR_SCRGB)
             {
-                if (ImGui::Checkbox("Disable Local Dimming", &m_disableLocalDimming))
+                if (ImGui::Checkbox("Enable Local Dimming", &m_enableLocalDimming))
                 {
-                    OnResize(m_Width, m_Height);
+                    OnLocalDimmingChanged();
                 }
             }
 
@@ -386,7 +402,7 @@ void LPMSample::OnRender()
     if (m_bPlay)
     {
         m_time += (float)m_deltaTime / 1000.0f;
-    }    
+    }
 
     // transform scene
     //
@@ -416,9 +432,9 @@ int WINAPI WinMain(HINSTANCE hInstance,
     LPSTR lpCmdLine,
     int nCmdShow)
 {
-    LPCSTR Name = "LPMSample DX12 v1.0";
+    LPCSTR Name = "LPMSample VK v1.0";
 
-    // create new DX sample
+    // create new Vulkan sample
     return RunFramework(hInstance, lpCmdLine, nCmdShow, new LPMSample(Name));
 }
 
