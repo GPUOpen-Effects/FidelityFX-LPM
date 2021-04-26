@@ -38,9 +38,9 @@ namespace CAULDRON_DX12
             StaticBufferPool *pStaticBufferPool,
             UINT sampleDescCount,
             DXGI_FORMAT outFormat,
-            UINT numRows, UINT numColms, std::string flipBookAnimationTexture, XMMATRIX worldMatrix);
+            UINT numRows, UINT numColms, std::string flipBookAnimationTexture, math::Matrix4 worldMatrix);
         void OnDestroy();
-        void Draw(ID3D12GraphicsCommandList* pCommandList, float time, XMVECTOR camPos, XMMATRIX viewProjMat);
+        void Draw(ID3D12GraphicsCommandList* pCommandList, float time, math::Vector4 camPos, math::Matrix4 viewProjMat);
 
     private:
         Device* m_pDevice;
@@ -64,16 +64,16 @@ namespace CAULDRON_DX12
         UINT m_numRows;
         UINT m_numColms;
 
-        XMMATRIX m_worldMatrix;
+        math::Matrix4 m_worldMatrix;
 
         struct FlipBookAnimationCBuffer {
             UINT row;
             UINT cols;
             float time;
             float angle;
-            XMVECTOR camPos;
-            XMMATRIX worldMat;
-            XMMATRIX viewProjMat;
+            math::Vector4 camPos;
+            math::Matrix4 worldMat;
+            math::Matrix4 viewProjMat;
         };
     };
 }

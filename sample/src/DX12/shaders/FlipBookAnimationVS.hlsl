@@ -22,25 +22,25 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerFrame : register(b0)
 {
-	uint u_row;
-	uint u_cols;
-	float u_time;
-	float u_angle;
-	float4 u_camPos;
-	matrix u_mWorld;
-	matrix u_mCameraViewProj;
+    uint u_row;
+    uint u_cols;
+    float u_time;
+    float u_angle;
+    float4 u_camPos;
+    matrix u_mWorld;
+    matrix u_mCameraViewProj;
 };
 
 struct VERTEX_IN
 {
-	float4 vPosition : POSITION;
-	float2 vTexcoord : TEXCOORD;
+    float4 vPosition : POSITION;
+    float2 vTexcoord : TEXCOORD;
 };
 
 struct VERTEX_OUT
 {
-	float4 vPosition : SV_POSITION; 
-	float2 vTexcoord : TEXCOORD;
+    float4 vPosition : SV_POSITION;
+    float2 vTexcoord : TEXCOORD;
 }; 
 
 VERTEX_OUT mainVS(VERTEX_IN Input)
@@ -61,20 +61,20 @@ VERTEX_OUT mainVS(VERTEX_IN Input)
 
     float2 size = float2(1.0f / u_cols, 1.0f / u_row);
     uint totalFrames = u_row * u_cols;
-	
+
     // use timer to increment index
     uint index = (u_time * 60) % totalFrames;
-	
+
     // wrap x and y indexes
     uint indexX = index % u_cols;
     uint indexY = index / u_cols;
-	
+
     // get offsets to our sprite index
     float2 offset = float2(size.x*indexX, size.y*indexY);
-	
+
     // get single sprite UV
     float2 newUV = Input.vTexcoord * size;
-	
+
     // Slight offset in Y because of visual seam
     newUV.y += 0.001;
 

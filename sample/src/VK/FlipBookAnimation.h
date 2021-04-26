@@ -38,9 +38,9 @@ namespace CAULDRON_VK
             DynamicBufferRing *pDynamicBufferRing,
             StaticBufferPool *pStaticBufferPool,
             VkSampleCountFlagBits sampleDescCount,
-            UINT numRows, UINT numColms, std::string flipBookAnimationTexture, XMMATRIX worldMatrix);
+            UINT numRows, UINT numColms, std::string flipBookAnimationTexture, math::Matrix4 worldMatrix);
         void OnDestroy();
-        void Draw(VkCommandBuffer cmd_buf, float time, XMVECTOR camPos, XMMATRIX viewProjMat);
+        void Draw(VkCommandBuffer cmd_buf, float time, math::Vector4 camPos, math::Matrix4 viewProjMat);
 
     private:
         Device * m_pDevice;
@@ -69,16 +69,16 @@ namespace CAULDRON_VK
         UINT m_numRows;
         UINT m_numColms;
 
-        XMMATRIX m_worldMatrix;
+        math::Matrix4 m_worldMatrix;
 
         struct FlipBookAnimationCBuffer {
             UINT row;
             UINT cols;
             float time;
             float angle;
-            XMVECTOR camPos;
-            XMMATRIX worldMat;
-            XMMATRIX viewProjMat;
+            math::Vector4 camPos;
+            math::Matrix4 worldMat;
+            math::Matrix4 viewProjMat;
         };
     };
 }

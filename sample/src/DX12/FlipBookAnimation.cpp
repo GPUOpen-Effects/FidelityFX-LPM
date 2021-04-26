@@ -31,7 +31,7 @@ namespace CAULDRON_DX12
         StaticBufferPool *pStaticBufferPool,
         UINT sampleDescCount,
         DXGI_FORMAT outFormat,
-        UINT numRows, UINT numColms, std::string flipBookAnimationTexture, XMMATRIX worldMatrix)
+        UINT numRows, UINT numColms, std::string flipBookAnimationTexture, math::Matrix4 worldMatrix)
     {
         m_pDevice = pDevice;
         m_pResourceViewHeaps = pResourceViewHeaps;
@@ -182,7 +182,7 @@ namespace CAULDRON_DX12
         m_pFlipBookTexture.OnDestroy();
     }
 
-    void FlipBookAnimation::Draw(ID3D12GraphicsCommandList* pCommandList, float time, XMVECTOR camPos, XMMATRIX viewProjMat)
+    void FlipBookAnimation::Draw(ID3D12GraphicsCommandList* pCommandList, float time, math::Vector4 camPos, math::Matrix4 viewProjMat)
     {
         D3D12_GPU_VIRTUAL_ADDRESS cbFlipBookAnimation;
         FlipBookAnimationCBuffer *pFlipBookAnimation;
@@ -191,9 +191,8 @@ namespace CAULDRON_DX12
         pFlipBookAnimation->cols = m_numColms;
         pFlipBookAnimation->time = time;
 
-        XMFLOAT4 dist;
-        XMStoreFloat4(&dist, camPos - m_worldMatrix.r[3]);
-        float angle = atan2(dist.x, dist.z);
+        math::Vector4 dist = camPos - m_worldMatrix.getCol3();
+        float angle = atan2(dist.getX(), dist.getZ());
 
         pFlipBookAnimation->angle = angle;
         pFlipBookAnimation->camPos = camPos;

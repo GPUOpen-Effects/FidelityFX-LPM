@@ -27,9 +27,9 @@ layout (location = 0) out vec4 outColor;
 
 layout(set=0, binding=1) uniform sampler2D sSampler;
 
-void main() 
+void main()
 {
     // Push the camp fire outside of rec709 gamut
-	outColor = texture(sSampler, inTexCoord.st);
-	outColor *= 2.0;
+    outColor = texture(sSampler, inTexCoord.st);
+    outColor *= 2.0;
 }

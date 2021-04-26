@@ -102,7 +102,15 @@ namespace CAULDRON_DX12
         m_scaleC = scaleC;
     }
 
-    void LPMPS::UpdatePipeline(DXGI_FORMAT outFormat, DisplayModes displayMode, ColorSpace colorSpace)
+    void LPMPS::UpdatePipeline(DXGI_FORMAT outFormat, DisplayMode displayMode, ColorSpace colorSpace,
+        bool shoulder,
+        float softGap,
+        float hdrMax,
+        float lpmExposure,
+        float contrast,
+        float shoulderContrast,
+        float saturation[3],
+        float crosstalk[3])
     {
         m_lpm.UpdatePipeline(outFormat);
 
@@ -121,30 +129,30 @@ namespace CAULDRON_DX12
         varAF2(displayMinMaxLuminance);
         if (displayMode != DISPLAYMODE_SDR)
         {
-            const AGSDisplayInfo *agsDisplayInfo = fsHdrGetDisplayInfo();
+            const DXGI_OUTPUT_DESC1 *displayInfo = GetDisplayInfo();
 
             // Only used in fs2 modes
-            fs2R[0] = (float) agsDisplayInfo->chromaticityRedX;
-            fs2R[1] = (float) agsDisplayInfo->chromaticityRedY;
-            fs2G[0] = (float) agsDisplayInfo->chromaticityGreenX;
-            fs2G[1] = (float) agsDisplayInfo->chromaticityGreenY;
-            fs2B[0] = (float) agsDisplayInfo->chromaticityBlueX;
-            fs2B[1] = (float) agsDisplayInfo->chromaticityBlueY;
-            fs2W[0] = (float) agsDisplayInfo->chromaticityWhitePointX;
-            fs2W[1] = (float) agsDisplayInfo->chromaticityWhitePointY;
+            fs2R[0] = displayInfo->RedPrimary[0];
+            fs2R[1] = displayInfo->RedPrimary[1];
+            fs2G[0] = displayInfo->GreenPrimary[0];
+            fs2G[1] = displayInfo->GreenPrimary[1];
+            fs2B[0] = displayInfo->BluePrimary[0];
+            fs2B[1] = displayInfo->BluePrimary[1];
+            fs2W[0] = displayInfo->WhitePoint[0];
+            fs2W[1] = displayInfo->WhitePoint[1];
             // Only used in fs2 modes
 
-            displayMinMaxLuminance[0] = (float) agsDisplayInfo->minLuminance;
-            displayMinMaxLuminance[1] = (float) agsDisplayInfo->maxLuminance;
+            displayMinMaxLuminance[0] = displayInfo->MinLuminance;
+            displayMinMaxLuminance[1] = displayInfo->MaxLuminance;
         }
-        m_shoulder = 0;
-        m_softGap = 1.0f / 32.0f;
-        m_hdrMax = 256.0f; // Controls brightness. Need to tune according to display mode
-        m_exposure = 8.0f; // Controls brightness. Need to tune according to display mode
-        m_contrast = 0.3f;
-        m_shoulderContrast = 1.0f;
-        m_saturation[0] = 0.0f; m_saturation[1] = 0.0f; m_saturation[2] = 0.0f;
-        m_crosstalk[0] = 1.0f; m_crosstalk[1] = 1.0f / 2.0f; m_crosstalk[2] = 1.0f / 32.0f;
+        m_shoulder = shoulder;
+        m_softGap = softGap;
+        m_hdrMax = hdrMax;
+        m_exposure = lpmExposure;
+        m_contrast = contrast;
+        m_shoulderContrast = shoulderContrast;
+        m_saturation[0] = saturation[0]; m_saturation[1] = saturation[1]; m_saturation[2] = saturation[2];
+        m_crosstalk[0] = crosstalk[0]; m_crosstalk[1] = crosstalk[1]; m_crosstalk[2] = crosstalk[2];
 
         switch (colorSpace)
         {

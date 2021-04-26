@@ -21,8 +21,6 @@
 
 #include "PostProc\PostProcPS.h"
 
-#define NUM_TEXTURES 3
-
 namespace CAULDRON_VK
 {
     class TestImages
@@ -33,25 +31,23 @@ namespace CAULDRON_VK
         void Draw(VkCommandBuffer cmd_buf, int testPattern);
 
     private:
+        struct TestImagesData {
+            VkDescriptorSet m_descriptorSet;
+            VkDescriptorSetLayout m_descriptorSetLayout;
+            VkImageView m_testImageTextureSRV;
+            Texture m_testImageTexture;
+        };
+
         Device* m_pDevice;
         ResourceViewHeaps *m_pResourceViewHeaps;
         DynamicBufferRing *m_pDynamicBufferRing = NULL;
         VkSampler m_sampler;
-        VkDescriptorSet m_descriptorSet[NUM_TEXTURES];
-        VkDescriptorSetLayout m_descriptorSetLayout[NUM_TEXTURES];
-        VkImageView m_testImageTextureSRV[NUM_TEXTURES];
-        Texture m_testImageTexture[NUM_TEXTURES];
+        TestImagesData m_testImagesData[3];
         PostProcPS m_testImagePS;
 
         struct TestImagesConsts
         {
             int testPattern;
-        };
-
-        std::vector<std::string> m_TextureNameList = {
-            "..\\media\\color_ramp_bt2020_dcip3\\LuxoDoubleChecker_EXR_ARGB_16F_1.DDS",
-            "..\\media\\color_ramp_bt2020_dcip3\\dcip3_1000_EXR_ARGB_16F_1.DDS",
-            "..\\media\\color_ramp_bt2020_dcip3\\bt2020_1000_EXR_ARGB_16F_1.DDS"
         };
     };
 }

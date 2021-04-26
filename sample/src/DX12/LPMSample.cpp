@@ -18,18 +18,16 @@
 // THE SOFTWARE.
 
 #include "stdafx.h"
+#include <intrin.h>
 
 #include "LPMSample.h"
 
 LPMSample::LPMSample(LPCSTR name) : FrameworkWindows(name)
 {
-    m_lastFrameTime = MillisecondsNow();
     m_time = 0;
     m_bPlay = true;
 
     m_pGltfLoader = NULL;
-    m_previousDisplayMode = m_currentDisplayMode = m_previousDisplayModeNamesIndex = m_currentDisplayModeNamesIndex = DISPLAYMODE_SDR;
-    m_disableLocalDimming = false;
 }
 
 //--------------------------------------------------------------------------------------
@@ -37,12 +35,82 @@ LPMSample::LPMSample(LPCSTR name) : FrameworkWindows(name)
 // OnParseCommandLine
 //
 //--------------------------------------------------------------------------------------
-void LPMSample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight, bool* pbFullScreen)
+void LPMSample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight)
 {
     // set some default values
     *pWidth = 1920;
     *pHeight = 1080;
-    *pbFullScreen = false;
+    m_activeScene = 0; //load the first one by default
+    m_VsyncEnabled = false;
+    m_bIsBenchmarking = false;
+    m_fontSize = 13.f; // default value overridden by a json file if available
+    m_isCpuValidationLayerEnabled = false;
+    m_isGpuValidationLayerEnabled = false;
+    m_initializeAGS = false;
+    m_activeCamera = 0;
+    m_stablePowerState = false;
+
+    //read globals
+    auto process = [&](json jData)
+    {
+        *pWidth = jData.value("width", *pWidth);
+        *pHeight = jData.value("height", *pHeight);
+        m_fullscreenMode = jData.value("presentationMode", m_fullscreenMode);
+        m_activeScene = jData.value("activeScene", m_activeScene);
+        m_activeCamera = jData.value("activeCamera", m_activeCamera);
+        m_isCpuValidationLayerEnabled = jData.value("CpuValidationLayerEnabled", m_isCpuValidationLayerEnabled);
+        m_isGpuValidationLayerEnabled = jData.value("GpuValidationLayerEnabled", m_isGpuValidationLayerEnabled);
+        m_initializeAGS = jData.value("AGSEnabled", m_initializeAGS);
+        m_VsyncEnabled = jData.value("vsync", m_VsyncEnabled);
+        m_bIsBenchmarking = jData.value("benchmark", m_bIsBenchmarking);
+        m_stablePowerState = jData.value("stablePowerState", m_stablePowerState);
+        m_fontSize = jData.value("fontsize", m_fontSize);
+    };
+
+    //read json globals from commandline
+    //
+    try
+    {
+        if (strlen(lpCmdLine) > 0)
+        {
+            auto j3 = json::parse(lpCmdLine);
+            process(j3);
+        }
+    }
+    catch (json::parse_error)
+    {
+        Trace("Error parsing commandline\n");
+        exit(0);
+    }
+
+    // read config file (and override values from commandline if so)
+    //
+    {
+        std::ifstream f("LPMSample.json");
+        if (!f)
+        {
+            MessageBox(NULL, "Config file not found!\n", "Cauldron Panic!", MB_ICONERROR);
+            exit(0);
+        }
+
+        try
+        {
+            f >> m_jsonConfigFile;
+        }
+        catch (json::parse_error)
+        {
+            MessageBox(NULL, "Error parsing LPMSample.json!\n", "Cauldron Panic!", MB_ICONERROR);
+            exit(0);
+        }
+    }
+
+
+    json globals = m_jsonConfigFile["globals"];
+    process(globals);
+
+    // get the list of scenes
+    for (const auto & scene : m_jsonConfigFile["scenes"])
+        m_sceneNames.push_back(scene["name"]);
 }
 
 //--------------------------------------------------------------------------------------
@@ -50,42 +118,25 @@ void LPMSample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* 
 // OnCreate
 //
 //--------------------------------------------------------------------------------------
-void LPMSample::OnCreate(HWND hWnd)
+void LPMSample::OnCreate()
 {
-    // Create Device
-    //
-    m_device.OnCreate("myapp", "myEngine", m_isCpuValidationLayerEnabled, m_isGpuValidationLayerEnabled, hWnd);
-    m_device.CreatePipelineCache();
-
     //init the shader compiler
     InitDirectXCompiler();
     CreateShaderCache();
 
-    // Create Swapchain
-    //
-    uint32_t dwNumberOfBackBuffers = 2;
-    m_swapChain.OnCreate(&m_device, dwNumberOfBackBuffers, hWnd);
-
     // Create a instance of the renderer and initialize it, we need to do that for each GPU
-    //
-    m_Node = new SampleRenderer();
-    m_Node->OnCreate(&m_device, &m_swapChain);
+    m_pRenderer = new Renderer();
+    m_pRenderer->OnCreate(&m_device, &m_swapChain, m_fontSize);
 
     // init GUI (non gfx stuff)
-    //
-    ImGUI_Init((void *)hWnd);
+    ImGUI_Init((void*)m_windowHwnd);
+    m_UIState.Initialize();
 
-    // init GUI state
-    m_state.testPattern = 0;
-    m_state.colorSpace = ColorSpace::ColorSpace_REC709;
-    m_state.toneMapper = 6;
-    m_state.exposure = 0.5f;
-    m_state.unusedExposure = 1.0f;
-    m_state.emmisiveFactor = 1.0f;
-    m_state.camera.LookAt(10.0f, 0.0f, 3.5f, XMVectorSet(-52.0f, -26.0f, -47.0f, 0));
-    m_state.lightIntensity = 10.0f;
+    OnResize();
+    OnUpdateDisplay();
 
-    m_swapChain.EnumerateDisplayModes(&m_displayModesAvailable, &m_displayModesNamesAvailable);
+    // Init Camera, looking at the origin
+    m_camera.LookAt(math::Vector4(0, 0, 5, 0), math::Vector4(0, 0, 0, 0));
 }
 
 //--------------------------------------------------------------------------------------
@@ -99,20 +150,11 @@ void LPMSample::OnDestroy()
 
     m_device.GPUFlush();
 
-    // Set display mode to SDR before quitting.
-    m_previousDisplayMode = m_currentDisplayMode = m_previousDisplayModeNamesIndex = m_currentDisplayModeNamesIndex = DISPLAYMODE_SDR;
+    m_pRenderer->UnloadScene();
+    m_pRenderer->OnDestroyWindowSizeDependentResources();
+    m_pRenderer->OnDestroy();
 
-    // Fullscreen state should always be false before exiting the app.
-    m_swapChain.SetFullScreen(false);
-
-    m_Node->UnloadScene();
-    m_Node->OnDestroyWindowSizeDependentResources();
-    m_Node->OnDestroy();
-
-    delete m_Node;
-
-    m_swapChain.OnDestroyWindowSizeDependentResources();
-    m_swapChain.OnDestroy();
+    delete m_pRenderer;
 
     //shut down the shader compiler 
     DestroyShaderCache(&m_device);
@@ -122,38 +164,35 @@ void LPMSample::OnDestroy()
         delete m_pGltfLoader;
         m_pGltfLoader = NULL;
     }
-
-    m_device.DestroyPipelineCache();
-    m_device.OnDestroy();
 }
 
 //--------------------------------------------------------------------------------------
 //
-// OnEvent
+// OnEvent, win32 sends us events and we forward them to ImGUI
 //
 //--------------------------------------------------------------------------------------
+static void ToggleBool(bool& b) { b = !b; }
 bool LPMSample::OnEvent(MSG msg)
 {
     if (ImGUI_WndProcHandler(msg.hwnd, msg.message, msg.wParam, msg.lParam))
         return true;
 
+    // handle function keys (F1, F2...) here, rest of the input is handled
+    // by imGUI later in HandleInput() function
+    const WPARAM& KeyPressed = msg.wParam;
+    switch (msg.message)
+    {
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+
+        /* WINDOW TOGGLES */
+        if (KeyPressed == VK_F1) ToggleBool(m_UIState.bShowControlsWindow);
+        if (KeyPressed == VK_F2) ToggleBool(m_UIState.bShowProfilerWindow);
+        break;
+    }
+
     return true;
-}
-
-//--------------------------------------------------------------------------------------
-//
-// SetFullScreen
-//
-//--------------------------------------------------------------------------------------
-void LPMSample::SetFullScreen(bool fullscreen)
-{
-    m_device.GPUFlush();
-
-    // when going to windowed make sure we are always using SDR
-    if ((fullscreen == false) && (m_currentDisplayMode != DISPLAYMODE_SDR))
-        m_previousDisplayMode = m_currentDisplayMode = m_previousDisplayModeNamesIndex = m_currentDisplayModeNamesIndex = DISPLAYMODE_SDR;
-
-    m_swapChain.SetFullScreen(fullscreen);
 }
 
 //--------------------------------------------------------------------------------------
@@ -161,56 +200,200 @@ void LPMSample::SetFullScreen(bool fullscreen)
 // OnResize
 //
 //--------------------------------------------------------------------------------------
-void LPMSample::OnResize(uint32_t width, uint32_t height)
+void LPMSample::OnResize()
 {
-    // Flush GPU
-    //
-    m_device.GPUFlush();
-
-    // If resizing but no minimizing
-    //
-    if (m_Width > 0 && m_Height > 0)
+    // Destroy resources (if we are not minimized)
+    if (m_Width && m_Height && m_pRenderer)
     {
-        if (m_Node != NULL)
-        {
-            m_Node->OnDestroyWindowSizeDependentResources();
-        }
-        m_swapChain.OnDestroyWindowSizeDependentResources();
+        m_pRenderer->OnDestroyWindowSizeDependentResources();
+        m_pRenderer->OnCreateWindowSizeDependentResources(&m_swapChain, m_Width, m_Height);
     }
 
-    m_Width = width;
-    m_Height = height;
-
-    m_swapChain.EnumerateDisplayModes(&m_displayModesAvailable, &m_displayModesNamesAvailable);
-
-    // if resizing but not minimizing the recreate it with the new size
-    //
-    if (m_Width > 0 && m_Height > 0)
-    {
-        m_swapChain.OnCreateWindowSizeDependentResources(m_Width, m_Height, false, m_currentDisplayMode, m_disableLocalDimming);
-        if (m_Node != NULL)
-        {
-            m_Node->OnCreateWindowSizeDependentResources(&m_swapChain, m_Width, m_Height, &m_state);
-        }
-    }
-
-    m_state.camera.SetFov(XM_PI / 4, m_Width, m_Height, 0.1f, 1000.0f);
+    m_camera.SetFov(AMD_PI_OVER_4, m_Width, m_Height, 0.1f, 1000.0f);
 }
 
 //--------------------------------------------------------------------------------------
 //
-// OnActivate
+// UpdateDisplay
 //
 //--------------------------------------------------------------------------------------
-void LPMSample::OnActivate(bool windowActive)
+void LPMSample::OnUpdateDisplay()
 {
-    if (m_previousDisplayMode == DisplayModes::DISPLAYMODE_SDR && m_currentDisplayMode == DisplayModes::DISPLAYMODE_SDR)
-        return;
+    // Update resources that depend on display mode changed
+    if (m_pRenderer)
+    {
+        m_pRenderer->OnUpdateDisplayDependentResources(&m_swapChain, &m_UIState);
+    }
+}
 
-    m_currentDisplayMode = windowActive && m_swapChain.IsFullScreen() ? m_previousDisplayMode : DisplayModes::DISPLAYMODE_SDR;
-    m_currentDisplayModeNamesIndex= windowActive && m_swapChain.IsFullScreen() ? m_previousDisplayModeNamesIndex : DisplayModes::DISPLAYMODE_SDR;
+//--------------------------------------------------------------------------------------
+//
+// LoadScene
+//
+//--------------------------------------------------------------------------------------
+void LPMSample::LoadScene(int sceneIndex)
+{
+    json scene = m_jsonConfigFile["scenes"][sceneIndex];
 
-    OnResize(m_Width, m_Height);
+    // release everything and load the GLTF, just the light json data, the rest (textures and geometry) will be done in the main loop
+    if (m_pGltfLoader != NULL)
+    {
+        m_pRenderer->UnloadScene();
+        m_pRenderer->OnDestroyWindowSizeDependentResources();
+        m_pRenderer->OnDestroy();
+        m_pGltfLoader->Unload();
+        m_pRenderer->OnCreate(&m_device, &m_swapChain, m_fontSize);
+        m_pRenderer->OnCreateWindowSizeDependentResources(&m_swapChain, m_Width, m_Height);
+    }
+
+    delete(m_pGltfLoader);
+    m_pGltfLoader = new GLTFCommon();
+    if (m_pGltfLoader->Load(scene["directory"], scene["filename"]) == false)
+    {
+        MessageBox(NULL, "The selected model couldn't be found, please check the documentation", "Cauldron Panic!", MB_ICONERROR);
+        exit(0);
+    }
+
+    // Load the UI settings, and also some defaults cameras and lights, in case the GLTF has none
+    {
+#define LOAD(j, key, val) val = j.value(key, val)
+
+        // global settings
+        LOAD(scene, "toneMapper", m_UIState.SelectedTonemapperIndex);
+        LOAD(scene, "exposure", m_UIState.Exposure);
+        LOAD(scene, "emmisiveFactor", m_UIState.EmissiveFactor);
+
+        // Add a default light in case there are none
+        //
+        if (m_pGltfLoader->m_lights.size() == 0)
+        {
+            tfNode n;
+            n.m_tranform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, math::Vector4(0, 0, 0, 0));
+
+            tfLight l;
+            l.m_type = tfLight::LIGHT_SPOTLIGHT;
+            l.m_intensity = scene.value("intensity", 1.0f);
+            l.m_color = math::Vector4(1.0f, 1.0f, 1.0f, 0.0f);
+            l.m_range = 15;
+            l.m_outerConeAngle = AMD_PI_OVER_4;
+            l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
+
+            m_pGltfLoader->AddLight(n, l);
+        }
+
+        // Allocate shadow information (if any)
+        m_pRenderer->AllocateShadowMaps(m_pGltfLoader);
+
+        // set default camera
+        //
+        json camera = scene["camera"];
+        m_activeCamera = scene.value("activeCamera", m_activeCamera);
+        math::Vector4 from = GetVector(GetElementJsonArray(camera, "defaultFrom", { 0.0, 0.0, 10.0 }));
+        math::Vector4 to = GetVector(GetElementJsonArray(camera, "defaultTo", { 0.0, 0.0, 0.0 }));
+        m_camera.LookAt(from, to);
+
+        // set benchmarking state if enabled 
+        //
+        if (m_bIsBenchmarking)
+        {
+            std::string deviceName;
+            std::string driverVersion;
+            m_device.GetDeviceInfo(&deviceName, &driverVersion);
+            BenchmarkConfig(scene["BenchmarkSettings"], m_activeCamera, m_pGltfLoader, deviceName, driverVersion);
+        }
+
+        // indicate the mainloop we started loading a GLTF and it needs to load the rest (textures and geometry)
+        m_loadingScene = true;
+    }
+}
+//--------------------------------------------------------------------------------------
+//
+// OnUpdate
+//
+//--------------------------------------------------------------------------------------
+void LPMSample::OnUpdate()
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    //If the mouse was not used by the GUI then it's for the camera
+    if (io.WantCaptureMouse)
+    {
+        io.MouseDelta.x = 0;
+        io.MouseDelta.y = 0;
+        io.MouseWheel = 0;
+    }
+
+    // Update Camera
+    UpdateCamera(m_camera, io);
+
+    // Keyboard & Mouse
+    HandleInput(io);
+
+    // Animation Update
+    if (m_bPlay)
+        m_time += (float)m_deltaTime / 1000.0f; // animation time in seconds
+
+    if (m_pGltfLoader)
+    {
+        m_pGltfLoader->SetAnimationTime(0, m_time);
+        m_pGltfLoader->TransformScene(0, math::Matrix4::identity());
+    }
+}
+void LPMSample::HandleInput(const ImGuiIO& io)
+{
+    auto fnIsKeyTriggered = [&io](char key) { return io.KeysDown[key] && io.KeysDownDuration[key] == 0.0f; };
+
+    // Handle Keyboard/Mouse input here
+
+    /* MAGNIFIER CONTROLS */
+    if (fnIsKeyTriggered('L'))                       m_UIState.ToggleMagnifierLock();
+    if (fnIsKeyTriggered('M') || io.MouseClicked[2]) ToggleBool(m_UIState.bUseMagnifier); // middle mouse / M key toggles magnifier
+
+    if (io.MouseClicked[1] && m_UIState.bUseMagnifier) // right mouse click
+        m_UIState.ToggleMagnifierLock();
+
+    if (fnIsKeyTriggered('R'))
+        m_UIState.ResetLPMSceneDefaults();
+}
+void LPMSample::UpdateCamera(Camera& cam, const ImGuiIO& io)
+{
+    float yaw = cam.GetYaw();
+    float pitch = cam.GetPitch();
+    float distance = cam.GetDistance();
+
+    cam.UpdatePreviousMatrices(); // set previous view matrix
+
+    // Sets Camera based on UI selection (WASD, Orbit or any of the GLTF cameras)
+    if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
+    {
+        yaw -= io.MouseDelta.x / 100.f;
+        pitch += io.MouseDelta.y / 100.f;
+    }
+
+    // Choose camera movement depending on setting
+    if (m_activeCamera == 0)
+    {
+        //  Orbiting
+        distance -= (float)io.MouseWheel / 3.0f;
+        distance = std::max<float>(distance, 0.1f);
+
+        bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
+
+        cam.UpdateCameraPolar(yaw, pitch,
+            panning ? -io.MouseDelta.x / 100.0f : 0.0f,
+            panning ? io.MouseDelta.y / 100.0f : 0.0f,
+            distance);
+    }
+    else if (m_activeCamera == 1)
+    {
+        //  WASD
+        cam.UpdateCameraWASD(yaw, pitch, io.KeysDown, io.DeltaTime);
+    }
+    else if (m_activeCamera > 1)
+    {
+        // Use a camera from the GLTF
+        m_pGltfLoader->GetCamera(m_activeCamera - 2, &cam);
+    }
 }
 
 //--------------------------------------------------------------------------------------
@@ -220,189 +403,40 @@ void LPMSample::OnActivate(bool windowActive)
 //--------------------------------------------------------------------------------------
 void LPMSample::OnRender()
 {
-    // Get timings
-    //
-    double timeNow = MillisecondsNow();
-    m_deltaTime = timeNow - m_lastFrameTime;
-    m_lastFrameTime = timeNow;
+    // Do any start of frame necessities
+    BeginFrame();
 
-    // Build UI and set the scene state. Note that the rendering of the UI happens later.
-    //    
     ImGUI_UpdateIO();
     ImGui::NewFrame();
 
-    static int cameraControlSelected = 1;
-    static int loadingStage = 0;
-    if (loadingStage >= 0)
+    if (m_loadingScene)
     {
-        // LoadScene needs to be called a number of times, the scene is not fully loaded until it returns -1
-        // This is done so we can display a progress bar when the scene is loading
-        if (m_pGltfLoader == NULL)
+        // the scene loads in chunks, that way we can show a progress bar
+        static int loadingStage = 0;
+        loadingStage = m_pRenderer->LoadScene(m_pGltfLoader, loadingStage);
+        if (loadingStage == 0)
         {
-            m_pGltfLoader = new GLTFCommon();
-            m_pGltfLoader->Load("..\\media\\campfire\\", "Campfire_scene_groundscaled.gltf");
+            m_time = 0;
+            m_loadingScene = false;
         }
-
-        loadingStage = m_Node->LoadScene(m_pGltfLoader, loadingStage);
+    }
+    else if (m_pGltfLoader && m_bIsBenchmarking)
+    {
+        // Benchmarking takes control of the time, and exits the app when the animation is done
+        std::vector<TimeStamp> timeStamps = m_pRenderer->GetTimingValues();
+        m_time = BenchmarkLoop(timeStamps, &m_camera, m_pRenderer->GetScreenshotFileName());
     }
     else
     {
-        ImGuiStyle& style = ImGui::GetStyle();
-        style.FrameBorderSize = 1.0f;
-
-        bool opened = true;
-        ImGui::Begin("Stats", &opened);
-
-        if (ImGui::CollapsingHeader("Info", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            ImGui::Text("Resolution       : %ix%i", m_Width, m_Height);
-            std::vector<TimeStamp> timeStamps = m_Node->GetTimingValues();
-            if (timeStamps.size() > 0)
-            {
-                static float values[128];
-                values[127] = (float)(timeStamps.back().m_microseconds - timeStamps.front().m_microseconds);
-                float average = values[0];
-                for (int i = 0; i < 128 - 1; i++) { values[i] = values[i + 1]; average += values[i]; }
-                average /= 128;
-
-                ImGui::Text("%-17s:%7.1f FPS", "Framerate", (1.0f / average) * 1000000.0f);
-            }
-        }
-
-        if (ImGui::CollapsingHeader("Scene Setup", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            static float exposureStep = 0.0f;
-            ImGui::SliderFloat("Exposure", &exposureStep, -4.0f, +1.0f, NULL, 1.0f);
-            m_state.exposure = (float)pow(2, exposureStep);
-            ImGui::SliderFloat("Emmisive", &m_state.emmisiveFactor, 0.0f, 2.0f, NULL, 1.0f);
-            ImGui::SliderFloat("PointLightIntensity", &m_state.lightIntensity, 0.0f, 20.0f);
-
-            const char * tonemappers[] = { "Timothy", "DX11DSK", "Reinhard", "Uncharted2Tonemap", "ACES", "No tonemapper", "FidelityFX LPM" };
-            ImGui::Combo("Tone mapper", &m_state.toneMapper, tonemappers, _countof(tonemappers));
-
-            static bool openWarning = false;
-
-            const char **displayModeNames = &m_displayModesNamesAvailable[0];
-            if (ImGui::Combo("Display Mode", (int *)&m_currentDisplayModeNamesIndex, displayModeNames, (int)m_displayModesNamesAvailable.size()))
-            {
-                if (m_swapChain.IsFullScreen())
-                {
-                    m_previousDisplayMode = m_currentDisplayMode = m_displayModesAvailable[m_currentDisplayModeNamesIndex];
-                    m_previousDisplayModeNamesIndex = m_currentDisplayModeNamesIndex;
-                    OnResize(m_Width, m_Height);
-                }
-                else
-                {
-                    openWarning = true;
-                    m_previousDisplayMode = m_currentDisplayMode = DisplayModes::DISPLAYMODE_SDR;
-                    m_previousDisplayModeNamesIndex = m_currentDisplayModeNamesIndex = DisplayModes::DISPLAYMODE_SDR;
-                }
-            }
-
-            if (openWarning)
-            {
-                ImGui::OpenPopup("Display Modes Warning");
-                ImGui::BeginPopupModal("Display Modes Warning", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-                ImGui::Text("\nChanging display modes is only available in fullscreen, please press ALT + ENTER for fun!\n\n");
-                if (ImGui::Button("Cancel", ImVec2(120, 0))) { openWarning = false; ImGui::CloseCurrentPopup(); }
-                ImGui::EndPopup();
-            }
-
-            if (m_currentDisplayMode == DisplayModes::DISPLAYMODE_FSHDR_Gamma22 || m_currentDisplayMode == DisplayModes::DISPLAYMODE_FSHDR_SCRGB)
-            {
-                if (ImGui::Checkbox("Disable Local Dimming", &m_disableLocalDimming))
-                {
-                    OnResize(m_Width, m_Height);
-                }
-            }
-
-            const char * testPatterns[] = { "None", "Luxo Double Checker", "DCI P3 1000 Nits", "REC 2020 1000 Nits", "Rec 709 5000 Nits" };
-            if (ImGui::Combo("Test Patterns", &m_state.testPattern, testPatterns, _countof(testPatterns)))
-            {
-                if (m_state.testPattern == 2) // P3
-                    m_state.colorSpace = ColorSpace::ColorSpace_P3;
-                else if (m_state.testPattern == 3) // rec2020
-                    m_state.colorSpace = ColorSpace::ColorSpace_REC2020;
-                else // Rec 709
-                    m_state.colorSpace = ColorSpace::ColorSpace_REC709;
-
-                // Flush GPU
-                //
-                m_device.GPUFlush();
-
-                if (m_Node != NULL)
-                {
-                    m_Node->OnDestroyWindowSizeDependentResources();
-                    m_Node->OnCreateWindowSizeDependentResources(&m_swapChain, m_Width, m_Height, &m_state);
-                }
-            }
-
-            const char * cameraControl[] = { "WASD", "Orbit" };
-            ImGui::Combo("Camera", &cameraControlSelected, cameraControl, _countof(cameraControl));
-        }
-
-        ImGui::End();
+        BuildUI();  // UI logic. Note that the rendering of the UI happens later.
+        OnUpdate(); // Update camera, handle keyboard/mouse input
     }
 
-    // If the mouse was not used by the GUI then it's for the camera
-    //
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureMouse == false)
-    {
-        float yaw = m_state.camera.GetYaw();
-        float pitch = m_state.camera.GetPitch();
-        float distance = m_state.camera.GetDistance();
+    // Do Render frame using AFR
+    m_pRenderer->OnRender(&m_UIState, m_camera, &m_swapChain, m_time);
 
-        if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
-        {
-            yaw -= io.MouseDelta.x / 100.f;
-            pitch += io.MouseDelta.y / 100.f;
-        }
-
-        // Choose camera movement depending on setting
-        //
-
-        if (cameraControlSelected == 0)
-        {
-            //  WASD
-            //
-            m_state.camera.UpdateCameraWASD(yaw, pitch, io.KeysDown, io.DeltaTime);
-        }
-        else
-        {
-            //  Orbiting
-            //
-            distance -= (float)io.MouseWheel / 3.0f;
-            distance = std::max<float>(distance, 0.1f);
-
-            bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
-
-            m_state.camera.UpdateCameraPolar(yaw, pitch, panning ? -io.MouseDelta.x / 100.0f : 0.0f, panning ? io.MouseDelta.y / 100.0f : 0.0f, distance);
-        }
-    }
-
-    // Set animation time
-    //
-    if (m_bPlay)
-    {
-        m_time += (float)m_deltaTime / 1000.0f;
-    }    
-
-    // transform scene
-    //
-    if (m_pGltfLoader)
-    {
-        m_pGltfLoader->SetAnimationTime(0, m_time);
-        m_pGltfLoader->TransformScene(0, XMMatrixIdentity());
-    }
-
-    m_state.time = m_time;
-
-    // Do Render frame using AFR 
-    //
-    m_Node->OnRender(&m_state, &m_swapChain);
-
-    m_swapChain.Present();
+    // Framework will handle Present and some other end of frame logic
+    EndFrame();
 }
 
 
@@ -416,7 +450,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
     LPSTR lpCmdLine,
     int nCmdShow)
 {
-    LPCSTR Name = "LPMSample DX12 v1.0";
+    LPCSTR Name = "LPMSample DX12 v1.2";
 
     // create new DX sample
     return RunFramework(hInstance, lpCmdLine, nCmdShow, new LPMSample(Name));

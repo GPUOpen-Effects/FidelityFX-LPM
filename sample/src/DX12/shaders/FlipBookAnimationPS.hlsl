@@ -22,13 +22,13 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerFrame : register(b0)
 {
-	uint u_row;
-	uint u_cols;
-	float u_time;
-	float u_angle;
-	float4 u_camPos;
-	matrix u_mWorld;
-	matrix u_mCameraViewProj;
+    uint u_row;
+    uint u_cols;
+    float u_time;
+    float u_angle;
+    float4 u_camPos;
+    matrix u_mWorld;
+    matrix u_mCameraViewProj;
 };
 
 //--------------------------------------------------------------------------------------
@@ -36,8 +36,8 @@ cbuffer cbPerFrame : register(b0)
 //--------------------------------------------------------------------------------------
 struct VERTEX
 {
-	float4 vPosition : SV_POSITION;
-	float2 vTexcoord : TEXCOORD;
+    float4 vPosition : SV_POSITION;
+    float2 vTexcoord : TEXCOORD;
 };
 
 //--------------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ SamplerState     samLinearClamp    :register(s0);
 //--------------------------------------------------------------------------------------
 float4 mainPS(VERTEX Input) : SV_Target
 {
-	float4 color = sceneTexture.Sample(samLinearClamp, Input.vTexcoord);
-	color.rgb *= 2.0;
-	return color;
+    float4 color = sceneTexture.Sample(samLinearClamp, Input.vTexcoord);
+    color.rgb *= 2.0;
+    return color;
 }

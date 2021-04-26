@@ -50,6 +50,30 @@
 // COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 // ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //------------------------------------------------------------------------------------------------------------------------------
+//  - https://github.com/michaldrobot/ShaderFastLibs/blob/master/LICENCE.txt
+///******************************************************************************
+// The MIT License (MIT)
+// 
+// Copyright (c) <2014> <Michal Drobot>
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+// ********************************************************************************
 // ABOUT
 // =====
 // For questions and comments, feel free to contact the author directly: timothy.lottes@amd.com
@@ -137,7 +161,6 @@
 // Requires standard C types: stdint.h
 // Requires a collection of standard math intrinsics.
 //  - Requires VS2013 when not using GCC to get exp2() and log2().
-//  - https://blogs.msdn.microsoft.com/vcblog/2013/07/19/c99-library-support-in-visual-studio-2013/
 //------------------------------------------------------------------------------------------------------------------------------
 // This provides a minimum subset of functionality compared to the GPU parts.
 //==============================================================================================================================
@@ -296,7 +319,7 @@
   A_STATIC AD1 AAbsD1(AD1 a){return fabs(a);}
   A_STATIC AF1 AAbsF1(AF1 a){return fabsf(a);}
   A_STATIC AU1 AAbsSU1(AU1 a){return AU1_(abs(ASU1_(a)));}
-  A_STATIC AL1 AAbsSL1(AL1 a){return AL1_(labs(ASL1_(a)));}
+  A_STATIC AL1 AAbsSL1(AL1 a){return AL1_(llabs(ASL1_(a)));}
  #endif
 //------------------------------------------------------------------------------------------------------------------------------
  #ifdef A_GCC

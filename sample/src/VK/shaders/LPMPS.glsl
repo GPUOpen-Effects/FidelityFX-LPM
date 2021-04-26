@@ -26,7 +26,7 @@ layout (location = 0) in vec2 inTexCoord;
 
 layout (location = 0) out vec4 outColor;
 
-layout (std140, binding = 0) uniform perBatch 
+layout (std140, binding = 0) uniform perBatch
 {
     bool u_shoulder;
     bool u_con;
@@ -61,7 +61,7 @@ AU4 LpmFilterCtl(AU1 i)
 
 #include "transferfunction.h"
 
-void main() 
+void main()
 {
     vec4 color = texture(sSampler, inTexCoord.st);
 
@@ -77,7 +77,7 @@ void main()
 
     switch (myPerScene.u_displayMode)
     {
-        case 1: 
+        case 1:
             // FS2_DisplayNative
             // Apply gamma
             color.xyz = ApplyGamma(color.rgb);

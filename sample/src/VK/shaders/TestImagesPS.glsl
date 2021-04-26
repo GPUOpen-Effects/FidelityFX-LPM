@@ -28,7 +28,7 @@ layout (location = 0) out vec4 outColor;
 
 layout (set=0, binding = 0, std140) uniform perFrame
 {
-	int           u_testPattern;
+    int           u_testPattern;
 } myPerFrame;
 
 layout(set=0, binding=1) uniform sampler2D sSampler;
@@ -36,7 +36,7 @@ layout(set=0, binding=1) uniform sampler2D sSampler;
 void main() 
 {
     vec4 texColor = vec4(1.0,1.0,1.0,1.0);
-	switch (myPerFrame.u_testPattern)
+    switch (myPerFrame.u_testPattern)
     {
         case 0:
         case 1:

@@ -28,61 +28,67 @@
 #include <windows.h>
 #include <windowsx.h>
 
-
 // C RunTime Header Files
 #include <malloc.h>
 #include <map>
 #include <mutex>
 #include <vector>
 #include <fstream>
-#include "..\..\libs\d3d12x\d3dx12.h"
 
-// we are using DirectXMath
-#include <DirectXMath.h>
-using namespace DirectX;
+#include "../../libs/d3d12x/d3dx12.h"
+
+// Pull in math library
+#include "../../libs/vectormath/vectormath.hpp"
 
 // TODO: reference additional headers your program requires here
-#include "base\Imgui.h"
-#include "Base\ImguiHelper.h"
-#include "base\Fence.h"
-#include "Base\Helper.h"
-#include "Base\Device.h"
-#include "base\FreesyncHDR.h"
-#include "base\Texture.h"
-#include "base\SwapChain.h"
-#include "base\UploadHeap.h"
-#include "Base\UserMarkers.h"
-#include "base\GPUTimestamps.h"
-#include "base\CommandListRing.h"
-#include "base\ShaderCompilerHelper.h"
-#include "base\StaticBufferPool.h"
-#include "base\DynamicBufferRing.h"
-#include "base\ResourceViewHeaps.h"
-#include "base\StaticConstantBufferPool.h"
+#include "Base/Imgui.h"
+#include "Base/ImguiHelper.h"
+#include "Base/Fence.h"
+#include "Base/Helper.h"
+#include "Base/Device.h"
+#include "Base/Texture.h"
+#include "Base/FrameworkWindows.h"
+#include "Base/FreeSyncHDR.h"
+#include "Base/SwapChain.h"
+#include "Base/UploadHeap.h"
+#include "Base/SaveTexture.h"
+#include "Base/UserMarkers.h"
+#include "Base/GPUTimestamps.h"
+#include "Base/CommandListRing.h"
+#include "Base/StaticBufferPool.h"
+#include "Base/DynamicBufferRing.h"
+#include "Base/ResourceViewHeaps.h"
+#include "Base/ShaderCompilerCache.h"
+#include "Base/ShaderCompilerHelper.h"
+#include "Base/StaticConstantBufferPool.h"
 
-#include "Misc\Misc.h"
-#include "Misc\Error.h"
-#include "Misc\Camera.h"
-#include "Misc\FrameworkWindows.h"
-#include "Misc\ColorConversion.h"
+#include "GLTF/GltfPbrPass.h"
+#include "GLTF/GltfBBoxPass.h"
+#include "GLTF/GltfDepthPass.h"
+#include "GLTF/GltfMotionVectorsPass.h"
 
-#include "GLTF\GltfPbrPass.h"
-#include "GLTF\GltfDepthPass.h"
-#include "GLTF\GltfBBoxPass.h"
+#include "Misc/Misc.h"
+#include "Misc/Error.h"
+#include "Misc/Camera.h"
+#include "Misc/ColorConversion.h"
 
-#include "PostProc\ColorConversionPS.h"
-#include "PostProc\ToneMapping.h"
-#include "PostProc\ToneMappingCS.h"
-#include "PostProc\DownSamplePS.h"
-#include "PostProc\SkyDome.h"
-#include "PostProc\SkyDomeProc.h"
-#include "PostProc\BlurPS.h"
-#include "PostProc\Bloom.h"
+#include "PostProc/TAA.h"
+#include "PostProc/Bloom.h"
+#include "PostProc/BlurPS.h"
+#include "PostProc/SkyDome.h"
+#include "PostProc/SkyDomeProc.h"
+#include "PostProc/PostProcCS.h"
+#include "PostProc/ToneMapping.h"
+#include "PostProc/ToneMappingCS.h"
+#include "PostProc/ColorConversionPS.h"
+#include "PostProc/DownSamplePS.h"
+#include "PostProc/ShadowResolvePass.h"
 
-#include "TestImages.h"
+#include "Widgets/wireframe.h"
+
 #include "FlipBookAnimation.h"
-#include "LPMPS.h"
+#include "TestImages.h"
 #include "ExposureMultiplierCS.h"
+#include "LPMPS.h"
 
-#include "Widgets\wireframe.h"
 using namespace CAULDRON_DX12;

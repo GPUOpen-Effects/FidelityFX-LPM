@@ -23,7 +23,7 @@
 #extension GL_ARB_shading_language_420pack : enable
 #extension GL_ARB_compute_shader  : enable
 
-layout (std140, binding = 0) uniform perBatch 
+layout (std140, binding = 0) uniform perBatch
 {
     float u_exposure;
 } myPerScene;

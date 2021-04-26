@@ -20,7 +20,6 @@
 #include "stdafx.h"
 #include "Base/DynamicBufferRing.h"
 #include "Base/ShaderCompiler.h"
-#include "Base/ExtDebugMarkers.h"
 #include "Base/UploadHeap.h"
 #include "Base/FreeSyncHDR.h"
 #include "Base/Helper.h"
@@ -131,7 +130,15 @@ namespace CAULDRON_VK
 
         m_scaleC = scaleC;
     }
-    void LPMPS::UpdatePipelines(VkRenderPass renderPass, DisplayModes displayMode, ColorSpace colorSpace)
+    void LPMPS::UpdatePipelines(VkRenderPass renderPass, DisplayMode displayMode, ColorSpace colorSpace,
+        bool shoulder,
+        float softGap,
+        float hdrMax,
+        float lpmExposure,
+        float contrast,
+        float shoulderContrast,
+        float saturation[3],
+        float crosstalk[3])
     {
         m_lpm.UpdatePipeline(renderPass, NULL, VK_SAMPLE_COUNT_1_BIT);
 
@@ -167,14 +174,14 @@ namespace CAULDRON_VK
             displayMinMaxLuminance[0] = pHDRMetatData->minLuminance;
             displayMinMaxLuminance[1] = pHDRMetatData->maxLuminance;
         }
-        m_shoulder = 0;
-        m_softGap = 1.0f / 32.0f;
-        m_hdrMax = 256.0f; // Controls brightness. Need to tune according to display mode
-        m_exposure = 8.0f; // Controls brightness. Need to tune according to display mode
-        m_contrast = 0.3f;
-        m_shoulderContrast = 1.0f;
-        m_saturation[0] = 0.0f; m_saturation[1] = 0.0f; m_saturation[2] = 0.0f;
-        m_crosstalk[0] = 1.0f; m_crosstalk[1] = 1.0f / 2.0f; m_crosstalk[2] = 1.0f / 32.0f;
+        m_shoulder = shoulder;
+        m_softGap = softGap;
+        m_hdrMax = hdrMax;
+        m_exposure = lpmExposure;
+        m_contrast = contrast;
+        m_shoulderContrast = shoulderContrast;
+        m_saturation[0] = saturation[0]; m_saturation[1] = saturation[1]; m_saturation[2] = saturation[2];
+        m_crosstalk[0] = crosstalk[0]; m_crosstalk[1] = crosstalk[1]; m_crosstalk[2] = crosstalk[2];
 
         switch (colorSpace)
         {
@@ -336,7 +343,7 @@ namespace CAULDRON_VK
         m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(LPMConsts), descriptorSet);
 
         // Draw!
-        m_lpm.Draw(cmd_buf, cbLPMHandle, descriptorSet);
+        m_lpm.Draw(cmd_buf, &cbLPMHandle, descriptorSet);
 
         SetPerfMarkerEnd(cmd_buf);
     }

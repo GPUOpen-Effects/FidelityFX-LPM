@@ -66,7 +66,7 @@ void main()
     vec2 offset = vec2(size.x*indexX, size.y*indexY);
 
     // get single sprite UV
-	vec2 newUV = inTexCoord * size;
+    vec2 newUV = inTexCoord * size;
 
     // Slight offset in Y because of visual seam
     newUV.y += 0.001;

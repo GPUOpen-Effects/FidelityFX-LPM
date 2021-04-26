@@ -21,8 +21,6 @@
 
 #include "PostProc\PostProcPS.h"
 
-#define NUM_TEXTURES 3
-
 namespace CAULDRON_DX12
 {
     class TestImages
@@ -33,20 +31,19 @@ namespace CAULDRON_DX12
         void Draw(ID3D12GraphicsCommandList* pCommandList, int testPattern);
 
     private:
+
+        struct TestImagesData {
+            CBV_SRV_UAV m_testImageTextureSRV;
+            Texture m_testImageTexture;
+        };
+
         DynamicBufferRing *m_pDynamicBufferRing = NULL;
-        CBV_SRV_UAV m_testImageTextureSRV[NUM_TEXTURES];
-        Texture m_testImageTexture[NUM_TEXTURES];
+        TestImagesData m_testImagesData[3];
         PostProcPS m_testImagePS;
 
         struct TestImagesConsts
         {
             int testPattern;
-        };
-
-        std::vector<std::string> m_TextureNameList = {
-            "..\\media\\color_ramp_bt2020_dcip3\\LuxoDoubleChecker_EXR_ARGB_16F_1.DDS",
-            "..\\media\\color_ramp_bt2020_dcip3\\dcip3_1000_EXR_ARGB_16F_1.DDS",
-            "..\\media\\color_ramp_bt2020_dcip3\\bt2020_1000_EXR_ARGB_16F_1.DDS"
         };
 	};
 }

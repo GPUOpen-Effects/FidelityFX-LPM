@@ -1,0 +1,82 @@
+{
+  "globals": {
+    "CpuValidationLayerEnabled": false,
+    "GpuValidationLayerEnabled": false,
+    "AGSEnabled": true,
+    "presentationMode": 0,
+    "width": 1920,
+    "height": 1080,
+    "activeScene": 0,
+    "benchmark": false,
+    "vsync": false,
+    "stablePowerState": false,
+    "fontsize":  13
+  },
+  "scenes": [
+    {
+      "name": "Campfire",
+      "directory": "..\\media\\campfire\\",
+      "filename": "Campfire_scene_groundscaled.gltf",
+      "toneMapper": 0,
+      "emmisiveFactor": 1,
+      "intensity": 10,
+      "exposure": 1,
+      "activeCamera": 0,
+      "camera": {
+        "defaultFrom": [ -53.5, -26.0, -49.0 ],
+        "defaultTo": [ -52.0, -26.0, -47.0 ]
+      },
+      "colorspace": 0,
+      "BenchmarkSettings": {
+        "timeStep": 1,
+        "timeStart": 0,
+        "timeEnd": 10000,
+        "exitWhenTimeEnds": true,
+        "resultsFilename": "Campfire.csv",
+        "warmUpFrames": 200,
+        "sequence": {
+          "timeStart": 0,
+          "timeEnd": 2000,
+          "keyFrames": [
+            {
+             "time": 1000,
+              "from": [ -53.5, -26.0, -49.0 ],
+              "to": [ -52.0, -26.0, -47.0 ],
+              "screenShotName": "camera1.jpg"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Luxo Double Checker",
+      "directory": "..\\media\\color_ramp_bt2020_dcip3\\",
+      "filename": "LuxoDoubleChecker_EXR_ARGB_16F_1.DDS",
+      "toneMapper": 0,
+      "exposure": 1,
+      "colorspace": 0
+    },
+    {
+      "name": "DCI P3 1000 Nits",
+      "directory": "..\\media\\color_ramp_bt2020_dcip3\\",
+      "filename": "dcip3_1000_EXR_ARGB_16F_1.DDS",
+      "toneMapper": 0,
+      "exposure": 1,
+      "colorspace": 1
+    },
+    {
+      "name": "REC 2020 1000 Nits",
+      "directory": "..\\media\\color_ramp_bt2020_dcip3\\",
+      "filename": "bt2020_1000_EXR_ARGB_16F_1.DDS",
+      "toneMapper": 0,
+      "exposure": 1,
+      "colorspace": 2
+    },
+    {
+      "name": "Rec 709 5000 Nits",
+      "toneMapper": 0,
+      "exposure": 1,
+      "colorspace": 0
+    }
+  ]
+}

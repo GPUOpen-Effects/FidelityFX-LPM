@@ -31,63 +31,59 @@
 // C RunTime Header Files
 #include <malloc.h>
 #include <map>
+#include <vector>
 #include <mutex>
 #include <fstream>
-#include <vector>
 
-#define VK_USE_PLATFORM_WIN32_KHR 1
 #include "vulkan/vulkan.h"
 
-
-// we are using DirectXMath
-#include <DirectXMath.h>
-using namespace DirectX;
+// Pull in math library
+#include "../../libs/vectormath/vectormath.hpp"
 
 // TODO: reference additional headers your program requires here
-#include "base\Imgui.h"
-#include "Base\ImguiHelper.h"
-#include "base\Texture.h"
-#include "base\Device.h"
-#include "base\SwapChain.h"
-#include "base\ExtFreeSyncHDR.h"
-#include "Base\FreeSyncHDR.h"
-#include "Base\Helper.h"
-#include "base\UploadHeap.h"
-#include "base\GPUTimeStamps.h"
-#include "Base\ExtDebugMarkers.h"
-#include "base\CommandListRing.h"
-#include "base\StaticBufferPool.h"
-#include "base\DynamicBufferRing.h"
-#include "base\ResourceViewHeaps.h"
-#include "Base\ShaderCompilerHelper.h"
+#include "Base/Imgui.h"
+#include "Base/ImguiHelper.h"
+#include "Base/Device.h"
+#include "Base/Helper.h"
+#include "Base/Texture.h"
+#include "Base/FrameworkWindows.h"
+#include "Base/FreeSyncHDR.h"
+#include "Base/SwapChain.h"
+#include "Base/UploadHeap.h"
+#include "Base/GPUTimeStamps.h"
+#include "Base/CommandListRing.h"
+#include "Base/StaticBufferPool.h"
+#include "Base/DynamicBufferRing.h"
+#include "Base/ResourceViewHeaps.h"
+#include "Base/ShaderCompilerCache.h"
+#include "Base/ShaderCompilerHelper.h"
 
-#include "Misc\Error.h"
-#include "misc\Misc.h"
-#include "misc\Camera.h"
+#include "GLTF/GltfPbrPass.h"
+#include "GLTF/GltfBBoxPass.h"
+#include "GLTF/GltfDepthPass.h"
 
-#include "GLTF\GltfPbrPass.h"
-#include "GLTF\GltfBBoxPass.h"
-#include "GLTF\GltfDepthPass.h"
+#include "Misc/Misc.h"
+#include "Misc/Camera.h"
 
-#include "PostProc\Bloom.h"
-#include "PostProc\BlurPS.h"
-#include "PostProc\SkyDome.h"
-#include "PostProc\SkyDomeProc.h"
-#include "PostProc\DownSamplePS.h"
-#include "PostProc\ColorConversionPS.h"
-#include "PostProc\ToneMapping.h"
-#include "PostProc\ToneMappingCS.h"
+#include "PostProc/TAA.h"
+#include "PostProc/Bloom.h"
+#include "PostProc/BlurPS.h"
+#include "PostProc/SkyDome.h"
+#include "PostProc/ToneMapping.h"
+#include "PostProc/ToneMappingCS.h"
+#include "PostProc/ColorConversionPS.h"
+#include "PostProc/SkyDomeProc.h"
+#include "PostProc/DownSamplePS.h"
 
-#include "TestImages.h"
+
+#include "Widgets/Axis.h"
+#include "Widgets/CheckerBoardFloor.h"
+#include "Widgets/WireframeBox.h"
+#include "Widgets/WireframeSphere.h"
+
 #include "FlipBookAnimation.h"
-#include "LPMPS.h"
+#include "TestImages.h"
 #include "ExposureMultiplierCS.h"
-
-#include "Widgets\Axis.h"
-#include "Widgets\CheckerBoardFloor.h"
-
-#include "..\common\Misc\Camera.h"
-#include "..\common\Misc\FrameworkWindows.h"
-#include "..\common\Misc\ColorConversion.h"
+#include "LPMPS.h"
 
 using namespace CAULDRON_VK;

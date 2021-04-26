@@ -27,7 +27,17 @@ namespace CAULDRON_DX12
     public:
         void OnCreate(Device* pDevice, ResourceViewHeaps *pResourceViewHeaps, DynamicBufferRing *pDynamicBufferRing, StaticBufferPool  *pStaticBufferPool, DXGI_FORMAT outFormat);
         void OnDestroy();
-        void UpdatePipeline(DXGI_FORMAT outFormat, DisplayModes displayMode, ColorSpace colourSpace);
+
+        void UpdatePipeline(DXGI_FORMAT outFormat, DisplayMode displayMode, ColorSpace colorSpace,
+            bool shoulder,
+            float softGap,
+            float hdrMax,
+            float lpmExposure,
+            float contrast,
+            float shoulderContrast,
+            float saturation[3],
+            float crosstalk[3]);
+
         void Draw(ID3D12GraphicsCommandList* pCommandList, CBV_SRV_UAV *pSRV);
 
     private:
@@ -61,8 +71,8 @@ namespace CAULDRON_DX12
         PostProcPS m_lpm;
         DynamicBufferRing *m_pDynamicBufferRing = NULL;
 
-        DisplayModes m_displayMode;
-        XMMATRIX m_inputToOutputMatrix;
+        DisplayMode m_displayMode;
+        math::Matrix4 m_inputToOutputMatrix;
 
         struct LPMConsts {
             UINT shoulder;
@@ -73,7 +83,7 @@ namespace CAULDRON_DX12
             UINT scaleOnly;
             UINT displayMode;
             UINT pad;
-            XMMATRIX inputToOutputMatrix;
+            math::Matrix4 inputToOutputMatrix;
             uint32_t ctl[24 * 4];
         };
     };

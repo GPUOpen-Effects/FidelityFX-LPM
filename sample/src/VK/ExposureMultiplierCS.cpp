@@ -20,7 +20,6 @@
 #include "stdafx.h"
 #include "Base/DynamicBufferRing.h"
 #include "Base/StaticBufferPool.h"
-#include "Base/ExtDebugMarkers.h"
 #include "Base/UploadHeap.h"
 #include "Base/Helper.h"
 #include "ExposureMultiplierCS.h"
@@ -82,7 +81,7 @@ namespace CAULDRON_VK
         SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, descriptorSet);
         m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ExposureMultiplierConsts), descriptorSet);
 
-        m_ExposureMultiplier.Draw(cmd_buf, cbExposureMultiplierHandle, descriptorSet, (width + 7) / 8, (height + 7) / 8, 1);
+        m_ExposureMultiplier.Draw(cmd_buf, &cbExposureMultiplierHandle, descriptorSet, (width + 7) / 8, (height + 7) / 8, 1);
         
         SetPerfMarkerEnd(cmd_buf);
     }

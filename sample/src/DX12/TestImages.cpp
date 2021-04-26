@@ -41,35 +41,41 @@ namespace CAULDRON_DX12
         SamplerDesc.RegisterSpace = 0;
         SamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        for (int i = 0; i < NUM_TEXTURES; ++i)
+        static const char* s_TextureNameList[_countof(m_testImagesData)] = {
+            "..\\media\\color_ramp_bt2020_dcip3\\LuxoDoubleChecker_EXR_ARGB_16F_1.DDS",
+            "..\\media\\color_ramp_bt2020_dcip3\\dcip3_1000_EXR_ARGB_16F_1.DDS",
+            "..\\media\\color_ramp_bt2020_dcip3\\bt2020_1000_EXR_ARGB_16F_1.DDS"
+        };
+
+        for (int i = 0; i < _countof(m_testImagesData); ++i)
         {
-            m_testImageTexture[i].InitFromFile(pDevice, pUploadHeap, m_TextureNameList[i].c_str(), false);
+            m_testImagesData[i].m_testImageTexture.InitFromFile(pDevice, pUploadHeap, s_TextureNameList[i], false);
             pUploadHeap->FlushAndFinish();
-            pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(1, &m_testImageTextureSRV[i]);
-            m_testImageTexture[i].CreateSRV(0, &m_testImageTextureSRV[i]);
+            pResourceViewHeaps->AllocCBV_SRV_UAVDescriptor(1, &m_testImagesData[i].m_testImageTextureSRV);
+            m_testImagesData[i].m_testImageTexture.CreateSRV(0, &m_testImagesData[i].m_testImageTextureSRV);
         }
 
         m_testImagePS.OnCreate(pDevice, "TestImagesPS.hlsl", pResourceViewHeaps, pStaticBufferPool, 1, 1, &SamplerDesc, outFormat);
-	}
+    }
 
     void TestImages::OnDestroy()
     {
-        for (int i = 0; i < NUM_TEXTURES; ++i)
+        for (int i = 0; i < _countof(m_testImagesData); ++i)
         {
-            m_testImageTexture[i].OnDestroy();
+            m_testImagesData[i].m_testImageTexture.OnDestroy();
         }
 
         m_testImagePS.OnDestroy();
     }
 
     void TestImages::Draw(ID3D12GraphicsCommandList* pCommandList, int testPattern)
-    {		
+    {
         D3D12_GPU_VIRTUAL_ADDRESS cbTestImagesHandle;
         TestImagesConsts *pTestImagesConsts;
         m_pDynamicBufferRing->AllocConstantBuffer(sizeof(TestImagesConsts), (void **)&pTestImagesConsts, &cbTestImagesHandle);
 
         pTestImagesConsts->testPattern = testPattern - 1;
 
-        m_testImagePS.Draw(pCommandList, 1, &m_testImageTextureSRV[pTestImagesConsts->testPattern % NUM_TEXTURES], cbTestImagesHandle);
+        m_testImagePS.Draw(pCommandList, 1, &m_testImagesData[pTestImagesConsts->testPattern % _countof(m_testImagesData)].m_testImageTextureSRV, cbTestImagesHandle);
     }
 }

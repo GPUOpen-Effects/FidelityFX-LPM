@@ -57,33 +57,39 @@ namespace CAULDRON_VK
         layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         layoutBindings[1].pImmutableSamplers = NULL;
 
-        for (int i = 0; i < NUM_TEXTURES; ++i)
+        static const char* s_TextureNameList[_countof(m_testImagesData)] = {
+            "..\\media\\color_ramp_bt2020_dcip3\\LuxoDoubleChecker_EXR_ARGB_16F_1.DDS",
+            "..\\media\\color_ramp_bt2020_dcip3\\dcip3_1000_EXR_ARGB_16F_1.DDS",
+            "..\\media\\color_ramp_bt2020_dcip3\\bt2020_1000_EXR_ARGB_16F_1.DDS"
+        };
+
+        for (int i = 0; i < _countof(m_testImagesData); ++i)
         {
-            m_testImageTexture[i].InitFromFile(pDevice, pUploadHeap, m_TextureNameList[i].c_str(), false);
+            m_testImagesData[i].m_testImageTexture.InitFromFile(pDevice, pUploadHeap, s_TextureNameList[i], false);
             pUploadHeap->FlushAndFinish();
-            m_testImageTexture[i].CreateSRV(&m_testImageTextureSRV[i]);
-            m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layoutBindings, &m_descriptorSetLayout[i], &m_descriptorSet[i]);
-            m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(TestImagesConsts), m_descriptorSet[i]);
-            SetDescriptorSet(m_pDevice->GetDevice(), 1, m_testImageTextureSRV[i], &m_sampler, m_descriptorSet[i]);
+            m_testImagesData[i].m_testImageTexture.CreateSRV(&m_testImagesData[i].m_testImageTextureSRV);
+            m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layoutBindings, &m_testImagesData[i].m_descriptorSetLayout, &m_testImagesData[i].m_descriptorSet);
+            m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(TestImagesConsts), m_testImagesData[i].m_descriptorSet);
+            SetDescriptorSet(m_pDevice->GetDevice(), 1, m_testImagesData[i].m_testImageTextureSRV, &m_sampler, m_testImagesData[i].m_descriptorSet);
         }
 
-        m_testImagePS.OnCreate(m_pDevice, renderPass, "TestImagesPS.glsl", "main", "", pStaticBufferPool, pDynamicBufferRing, m_descriptorSetLayout[0], NULL, VK_SAMPLE_COUNT_1_BIT);
+        m_testImagePS.OnCreate(m_pDevice, renderPass, "TestImagesPS.glsl", "main", "", pStaticBufferPool, pDynamicBufferRing, m_testImagesData[0].m_descriptorSetLayout, NULL, VK_SAMPLE_COUNT_1_BIT);
     }
 
     void TestImages::OnDestroy()
     {
-        for (int i = 0; i < NUM_TEXTURES; ++i)
+        for (int i = 0; i < _countof(m_testImagesData); ++i)
         {
-            vkDestroyImageView(m_pDevice->GetDevice(), m_testImageTextureSRV[i], NULL);
-            m_testImageTexture[i].OnDestroy();
-            m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
-            vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout[i], NULL);
+            vkDestroyImageView(m_pDevice->GetDevice(), m_testImagesData[i].m_testImageTextureSRV, NULL);
+            m_testImagesData[i].m_testImageTexture.OnDestroy();
+            m_pResourceViewHeaps->FreeDescriptor(m_testImagesData[i].m_descriptorSet);
+            vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_testImagesData[i].m_descriptorSetLayout, NULL);
         }
 
         m_testImagePS.OnDestroy();
 
         vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
-	}
+    }
 
     void TestImages::Draw(VkCommandBuffer cmd_buf, int testPattern)
     {
@@ -93,6 +99,6 @@ namespace CAULDRON_VK
 
         pTestImagesConsts->testPattern = testPattern - 1;
 
-        m_testImagePS.Draw(cmd_buf, cbTestImagesHandle, m_descriptorSet[pTestImagesConsts->testPattern % NUM_TEXTURES]);
+        m_testImagePS.Draw(cmd_buf, &cbTestImagesHandle, m_testImagesData[pTestImagesConsts->testPattern % _countof(m_testImagesData)].m_descriptorSet);
     }
 }
